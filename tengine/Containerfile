@@ -1,0 +1,32 @@
+FROM debian:stable-slim AS build
+ARG VERSION
+ARG CONFIGURE_FLAGS
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpcre3 libpcre3-dev \
+    zlib1g zlib1g-dev \
+    libssl-dev \
+    wget
+
+WORKDIR /usr/local/src
+RUN wget -O tengine-${VERSION}.tar.gz https://codeload.github.com/alibaba/tengine/tar.gz/refs/tags/${VERSION} \
+    && tar -xzf tengine-${VERSION}.tar.gz
+
+RUN cd tengine-${VERSION} && ./configure ${CONFIGURE_FLAGS} \
+    && make -j$(nproc) \
+    && make install
+
+FROM debian:stable-slim
+
+RUN apt-get update && apt-get install -y \
+    libpcre3 libpcre3-dev \
+    libssl3 libssl-dev
+
+COPY --from=build /usr/local/nginx /usr/local/nginx
+
+ENV PATH="/usr/local/nginx/sbin:$PATH"
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
