@@ -1,0 +1,98 @@
+name: Check and upgrade tengine container version
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  upgrade-container-version:
+    name: "Upgrade container version"
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.set-output.outputs.action }}
+      version: ${{ steps.set-output.outputs.version }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Clone tengine repository
+        uses: actions/checkout@v4
+        with:
+          repository: alibaba/tengine
+          ref: master
+          path: int.tmp/repo
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Check version
+        id: check-version
+        shell: bash
+        run: |
+          cd int.tmp/repo
+          TAG=$(git tag -l '[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n 1)
+          git checkout $TAG
+          echo -n "${TAG#v}" > version
+          cd ..
+
+          LAST_VERSION=$(cat ./int.tmp/repo/version)
+          CURRENT_VERSION=$(cat ./tengine/version)
+          IFS='.' read -r -a last_version_parts <<< "$LAST_VERSION"
+          IFS='.' read -r -a current_version_parts <<< "$CURRENT_VERSION"
+
+          action=""
+          for i in {0..2}; do
+            if (( ${last_version_parts[i]} > ${current_version_parts[i]} )); then
+              action="update"
+              break
+            fi
+          done
+
+          if [ -z "$action" ]; then
+            action="no-change"
+          fi
+
+          echo "$action"
+          echo "action=${action}" >> $GITHUB_OUTPUT
+          echo "version=${LAST_VERSION}" >> $GITHUB_OUTPUT
+      
+      - name: Set up QEMU
+        if: steps.check-version.outputs.action == 'update'
+        id: qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          image: tonistiigi/binfmt:latest
+          platforms: all
+
+      - name: Set up Docker Buildx
+        if: steps.check-version.outputs.action == 'update'
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Login
+        if: steps.check-version.outputs.action == 'update'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push container image
+        if: steps.check-version.outputs.action == 'update'
+        run: make push PROJECT=tengine VERSION=${{ needs.check.outputs.action }}
+      
+      - name: Git version change and push
+        if: steps.check-version.outputs.action == 'update'
+        run: |
+          git config --global user.name "Sebastian Vargas"
+          git config --global user.email "sebastian.varbel@gmail.com"
+          
+          version="${{ steps.check-version.outputs.version }}"
+          echo -n "${version}" > tengine/version
+
+          git add .
+          git commit -m "feat: [bot] upgrade tengine container image to '${version}' version"
+          git push origin ${{ github.event.repository.default_branch }}
