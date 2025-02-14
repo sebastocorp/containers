@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   upgrade-container-version:
     name: "Upgrade container version"
@@ -24,7 +28,7 @@ jobs:
         with:
           repository: alibaba/tengine
           ref: master
-          path: int.tmp/repo
+          path: int.tmp
           fetch-tags: true
           fetch-depth: 0
 
@@ -32,13 +36,13 @@ jobs:
         id: check-version
         shell: bash
         run: |
-          cd int.tmp/repo
+          cd int.tmp
           TAG=$(git tag -l '[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n 1)
           git checkout $TAG
           echo -n "${TAG#v}" > version
           cd ..
 
-          LAST_VERSION=$(cat ./int.tmp/repo/version)
+          LAST_VERSION=$(cat ./int.tmp/version)
           CURRENT_VERSION=$(cat ./tengine/version)
           IFS='.' read -r -a last_version_parts <<< "$LAST_VERSION"
           IFS='.' read -r -a current_version_parts <<< "$CURRENT_VERSION"
@@ -82,13 +86,17 @@ jobs:
 
       - name: Build and push container image
         if: steps.check-version.outputs.action == 'update'
-        run: make push PROJECT=tengine VERSION=${{ needs.check.outputs.action }}
+        run: |
+          version="${{ steps.check-version.outputs.version }}"
+          make push PROJECT=tengine VERSION=$version
       
       - name: Git version change and push
         if: steps.check-version.outputs.action == 'update'
         run: |
-          git config --global user.name "Sebastian Vargas"
-          git config --global user.email "sebastian.varbel@gmail.com"
+          author_name=$(git log -1 --pretty=format:'%an')
+          author_email=$(git log -1 --pretty=format:'%ae')
+          git config --global user.name "${author_name}"
+          git config --global user.email "${author_email}"
           
           version="${{ steps.check-version.outputs.version }}"
           echo -n "${version}" > tengine/version
