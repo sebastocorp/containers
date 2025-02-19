@@ -21,21 +21,9 @@ jobs:
         id: set-config
         run: |
           echo "Set '${{ matrix.item }}' version file and config flags"
-
           ITEM="${{ matrix.item }}"
           version_file="version_${ITEM}"
-          config_flags=""
-          
-          if [ "${ITEM}" == "simple" ]; then
-            config_flags=""
-          fi
-          
-          if [ "${ITEM}" == "min" ]; then
-            config_flags="--without-http_rewrite_module --without-http_gzip_module --without-http_proxy_module"
-          fi
-          
           echo "version_file=${version_file}" >> $GITHUB_OUTPUT
-          echo "config_flags=${config_flags}" >> $GITHUB_OUTPUT
       
       - name: Clone repository
         uses: actions/checkout@v4
@@ -112,9 +100,8 @@ jobs:
         if: steps.check-version.outputs.action == 'update'
         run: |
           version="${{ steps.check-version.outputs.version }}"
-          config_flags="${{ steps.set-config.outputs.configure_flags }}"
-          tag_extra="-${{ matrix.item }}"
-          make push PROJECT=tengine VERSION=$version IMG_TAG_EXTRA=$tag_extra IMG_BUILD_EXTRA="$config_flags"
+          build_type="${{ matrix.item }}"
+          make push PROJECT=tengine VERSION=$version IMG_TAG_EXTRA="-$build_type" IMG_BUILD_TYPE="$build_type"
       
       - name: Git version change and push
         if: steps.check-version.outputs.action == 'update'
@@ -126,6 +113,10 @@ jobs:
           
           version="${{ steps.check-version.outputs.version }}"
           echo -n "${version}" > tengine/${{ steps.set-config.outputs.version_file }}
+
+          git pull
+          sleep 3
+          git pull
 
           git add .
           git commit -m "feat: [bot] upgrade container image tengine '${{ matrix.item }}' to '${version}' version"

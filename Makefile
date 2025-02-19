@@ -4,7 +4,7 @@ VERSION ?=
 CONTAINER_TOOL ?= docker
 REGISTRY ?= ghcr.io/sebastocorp
 
-IMG_BUILD_EXTRA ?=
+IMG_BUILD_TYPE ?=
 IMG_TAG_EXTRA ?=
 IMG_NAME ?= containers
 IMG_TAG ?= $(PROJECT)-v$(VERSION)$(IMG_TAG_EXTRA)
@@ -29,12 +29,8 @@ all: push
 
 .PHONY: build
 build:
-	$(CONTAINER_TOOL) build --file $(PROJECT)/Containerfile --build-arg VERSION=$(VERSION) --build-arg CONFIGURE_FLAGS=$(IMG_BUILD_EXTRA) --no-cache --tag '$(IMG)' $(PROJECT)
+	$(CONTAINER_TOOL) build --file $(PROJECT)/Containerfile --build-arg VERSION=$(VERSION) --build-arg BUILD_TYPE=$(IMG_BUILD_TYPE) --no-cache --tag '$(IMG)' $(PROJECT)
 
 .PHONY: push
 push: build
 	$(CONTAINER_TOOL) push $(IMG)
-
-.PHONY: print
-print:
-	@echo "$(CONTAINER_TOOL) build --file $(PROJECT)/Containerfile --build-arg VERSION=$(VERSION) --build-arg CONFIGURE_FLAGS=$(IMG_BUILD_EXTRA) --no-cache --tag '$(IMG)' $(PROJECT)"
