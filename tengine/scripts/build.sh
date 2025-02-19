@@ -3,8 +3,9 @@
 BUILD_TYPE=$1
 VERSION=$2
 
-echo "[INFO] build type '${BUILD_TYPE}'; version '${VERSION}'"
+set -x
 
+echo "[INFO] build type '${BUILD_TYPE}'; version '${VERSION}'"
 
 if [ -z "${BUILD_TYPE}" ]; then
     echo "[ERROR] build type or version empty; Usage: ./build.sh <build-type> <version>"

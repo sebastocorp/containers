@@ -8,11 +8,10 @@ RUN ./scripts/build.sh ${BUILD_TYPE} ${VERSION}
 
 FROM debian:stable-slim
 
-RUN apt-get update && apt-get install -y \
-    libpcre3 libpcre3-dev \
-    libssl3 libssl-dev
-
 COPY --from=build /usr/local/nginx /usr/local/nginx
+COPY --from=build /src/scripts/deps.sh .
+
+RUN ./deps.sh ${BUILD_TYPE} && rm ./deps.sh
 
 ENV PATH="/usr/local/nginx/sbin:$PATH"
 
