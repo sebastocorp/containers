@@ -34,3 +34,7 @@ build:
 .PHONY: push
 push: build
 	$(CONTAINER_TOOL) push $(IMG)
+
+.PHONY: print
+print:
+	@echo "$(CONTAINER_TOOL) build --file $(PROJECT)/Containerfile --build-arg VERSION=$(VERSION) --build-arg CONFIGURE_FLAGS=$(IMG_BUILD_EXTRA) --no-cache --tag '$(IMG)' $(PROJECT)"

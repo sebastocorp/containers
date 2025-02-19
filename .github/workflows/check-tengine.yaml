@@ -112,9 +112,9 @@ jobs:
         if: steps.check-version.outputs.action == 'update'
         run: |
           version="${{ steps.check-version.outputs.version }}"
-          configure_frags="${{ steps.set-config.outputs.configure_flags }}"
+          config_flags="${{ steps.set-config.outputs.configure_flags }}"
           tag_extra="-${{ matrix.item }}"
-          make push PROJECT=tengine VERSION=$version IMG_TAG_EXTRA=$tag_extra IMG_BUILD_EXTRA=$configure_frags
+          make push PROJECT=tengine VERSION=$version IMG_TAG_EXTRA=$tag_extra IMG_BUILD_EXTRA="$config_flags"
       
       - name: Git version change and push
         if: steps.check-version.outputs.action == 'update'
