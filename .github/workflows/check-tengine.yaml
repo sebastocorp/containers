@@ -13,10 +13,30 @@ jobs:
   upgrade-container-version:
     name: "Upgrade container version"
     runs-on: ubuntu-latest
-    outputs:
-      action: ${{ steps.set-output.outputs.action }}
-      version: ${{ steps.set-output.outputs.version }}
+    strategy:
+      matrix:
+        item: [simple, min]
     steps:
+      - name: Set build flags by version
+        id: set-config
+        run: |
+          echo "Set '${{ matrix.item }}' version file and config flags"
+
+          ITEM="${{ matrix.item }}"
+          version_file="version_${ITEM}"
+          config_flags=""
+          
+          if [ "${ITEM}" == "simple" ]; then
+            config_flags=""
+          fi
+          
+          if [ "${ITEM}" == "min" ]; then
+            config_flags="--without-http_rewrite_module --without-http_gzip_module --without-http_proxy_module"
+          fi
+          
+          echo "version_file=${version_file}" >> $GITHUB_OUTPUT
+          echo "config_flags=${config_flags}" >> $GITHUB_OUTPUT
+      
       - name: Clone repository
         uses: actions/checkout@v4
         with:
@@ -43,7 +63,7 @@ jobs:
           cd ..
 
           LAST_VERSION=$(cat ./int.tmp/version)
-          CURRENT_VERSION=$(cat ./tengine/version)
+          CURRENT_VERSION=$(cat ./tengine/${{ steps.set-config.outputs.version_file }})
           IFS='.' read -r -a last_version_parts <<< "$LAST_VERSION"
           IFS='.' read -r -a current_version_parts <<< "$CURRENT_VERSION"
 
@@ -88,19 +108,21 @@ jobs:
         if: steps.check-version.outputs.action == 'update'
         run: |
           version="${{ steps.check-version.outputs.version }}"
-          make push PROJECT=tengine VERSION=$version
+          configure_frags="${{ steps.set-config.outputs.configure_flags }}"
+          tag_extra="-${{ matrix.item }}"
+          make push PROJECT=tengine VERSION=$version IMG_TAG_EXTRA=$tag_extra IMG_BUILD_EXTRA=$configure_frags
       
       - name: Git version change and push
         if: steps.check-version.outputs.action == 'update'
         run: |
           author_name=$(git log -1 --pretty=format:'%an')
           author_email=$(git log -1 --pretty=format:'%ae')
-          git config --global user.name "${author_name}"
-          git config --global user.email "${author_email}"
+          git config user.name "${author_name}"
+          git config user.email "${author_email}"
           
           version="${{ steps.check-version.outputs.version }}"
-          echo -n "${version}" > tengine/version
+          echo -n "${version}" > tengine/${{ steps.set-config.outputs.version_file }}
 
           git add .
-          git commit -m "feat: [bot] upgrade tengine container image to '${version}' version"
+          git commit -m "feat: [bot] upgrade container image tengine '${{ matrix.item }}' to '${version}' version"
           git push origin ${{ github.event.repository.default_branch }}
